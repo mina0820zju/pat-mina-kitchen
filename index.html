@@ -588,6 +588,7 @@ function toggleToken() {
 function compressImage(dataUrl, maxPx = 1200, quality = 0.80) {
   return new Promise(resolve => {
     const img = new Image();
+    img.onerror = () => resolve(dataUrl); // 格式无法解码时直接用原始数据
     img.onload = () => {
       let w = img.width, h = img.height;
       if (w > maxPx || h > maxPx) {
@@ -819,8 +820,28 @@ function dragLeave(e) {
 function dropPhoto(e) {
   e.preventDefault(); e.stopPropagation();
   document.getElementById('photo-zone').classList.remove('drag-over');
-  const file = e.dataTransfer.files[0] || (e.dataTransfer.items[0]?.getAsFile());
-  processPhotoFile(file);
+
+  // 路径1：直接从 files 取（Finder 拖拽）
+  if (e.dataTransfer.files?.length) {
+    processPhotoFile(e.dataTransfer.files[0]);
+    return;
+  }
+
+  // 路径2：items API（macOS Photos 拖拽，文件异步提供）
+  const item = e.dataTransfer.items?.[0];
+  if (!item) return;
+
+  if (item.kind === 'file') {
+    // 先尝试同步 getAsFile
+    const f = item.getAsFile();
+    if (f) { processPhotoFile(f); return; }
+
+    // 再尝试异步 webkitGetAsEntry（Photos app 常用此路径）
+    const entry = item.webkitGetAsEntry?.();
+    if (entry?.isFile) {
+      entry.file(file => processPhotoFile(file));
+    }
+  }
 }
 
 function clearPhoto(e) {
