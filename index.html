@@ -186,7 +186,7 @@
     }
     .photo-zone:hover { border-color:var(--primary-light);background:#fff8f5; }
     .photo-zone.drag-over { border-color:var(--primary);background:#fff3ef;transform:scale(1.01); }
-    .photo-zone input { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+    .photo-zone input { display:none; }
     .photo-hint { font-size:13px;color:var(--text-muted);margin-top:6px; }
     .photo-prev-img { width:100%;max-height:160px;object-fit:contain;border-radius:8px;display:block;background:var(--bg); }
     .photo-clear-btn {
@@ -342,6 +342,7 @@
       <div class="form-group">
         <label class="form-label">照片</label>
         <div class="photo-zone" id="photo-zone"
+             onclick="photozoneClick(event)"
              ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropPhoto(event)">
           <input type="file" accept="image/*" id="photo-input" onchange="onPhoto(event)">
           <div id="photo-hint-block">
@@ -787,7 +788,7 @@ function refreshHearts() {
 }
 
 async function processPhotoFile(file) {
-  if (!file || !file.type.startsWith('image/')) return;
+  if (!file) return;
   const reader = new FileReader();
   reader.onload = async ev => {
     formPhoto = await compressImage(ev.target.result);
@@ -801,6 +802,11 @@ async function processPhotoFile(file) {
 
 async function onPhoto(e) {
   processPhotoFile(e.target.files[0]);
+}
+
+function photozoneClick(e) {
+  if (e.target.id === 'photo-clear-btn') return;
+  document.getElementById('photo-input').click();
 }
 
 function dragOver(e) {
