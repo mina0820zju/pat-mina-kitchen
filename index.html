@@ -446,9 +446,13 @@
 
       <div class="settings-actions">
         <button class="btn btn-ghost" type="button" onclick="clearSync()">清除配置</button>
-        <button class="btn btn-secondary" type="button" onclick="pullFromGist()">从云端同步</button>
+        <button class="btn btn-secondary" type="button" onclick="pullFromGist()">合并云端数据</button>
         <button class="btn btn-primary" type="button" onclick="saveToken()">保存并连接</button>
       </div>
+      <button class="btn btn-danger" type="button" onclick="forceOverwriteFromGist()"
+              style="width:100%;margin-top:8px;font-size:13px">
+        ⬇ 强制从云端获取（覆盖本地）
+      </button>
     </div>
   </div>
 </div>
@@ -596,6 +600,33 @@ async function saveToken() {
   const storedId = getGistId();
   if (storedId) document.getElementById('s-gist-id').value = storedId;
   closeModal('settings-overlay');
+}
+
+async function forceOverwriteFromGist() {
+  if (!confirm('确定用云端数据完全覆盖本地？本地独有的菜将会丢失。')) return;
+  const token = getToken(); if (!token) return;
+  setSyncState('ing', '同步中…');
+  closeModal('settings-overlay');
+  try {
+    let gistId = getGistId();
+    if (!gistId) { gistId = await findGist(); if (gistId) localStorage.setItem(GIST_KEY, gistId); }
+    if (!gistId) { setSyncState('err', '未找到 Gist'); return; }
+    const res = await ghFetch(`https://api.github.com/gists/${gistId}`);
+    if (!res.ok) throw new Error(`请求失败（${res.status}）`);
+    const data     = await res.json();
+    const fileInfo = data.files[GIST_FILENAME];
+    let raw = fileInfo?.content;
+    if (fileInfo?.truncated && fileInfo?.raw_url) {
+      const rawRes = await fetch(fileInfo.raw_url);
+      raw = await rawRes.text();
+    }
+    if (!raw) throw new Error('云端数据为空');
+    db = JSON.parse(raw);
+    dbSave(); render();
+    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
+  } catch(e) {
+    setSyncState('err', e.message || '同步失败');
+  }
 }
 
 function copyGistId() {
