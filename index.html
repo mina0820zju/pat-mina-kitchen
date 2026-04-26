@@ -511,6 +511,17 @@ async function pushToGist() {
   }
 }
 
+/* 合并两个 db：local 优先，remote 中多出的菜补充进来 */
+function mergeDb(local, remote) {
+  const localIds = new Set(local.dishes.map(d => d.id));
+  const dishes   = [
+    ...local.dishes,
+    ...remote.dishes.filter(d => !localIds.has(d.id)),
+  ];
+  const cats = [...new Set([...local.cats, ...remote.cats])];
+  return { dishes, cats };
+}
+
 async function pullFromGist(silent = false) {
   const token = getToken(); if (!token) return false;
   if (!silent) setSyncState('ing', '同步中…');
@@ -522,7 +533,10 @@ async function pullFromGist(silent = false) {
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
     const raw  = data.files[GIST_FILENAME]?.content;
-    if (raw) { db = JSON.parse(raw); dbSave(); render(); }
+    if (raw) {
+      db = mergeDb(db, JSON.parse(raw)); // 合并而非覆盖，本地数据不丢失
+      dbSave(); render();
+    }
     setSyncState('ok', '已同步');
     updateSettingsStatus('ok');
     return true;
@@ -539,8 +553,9 @@ async function saveToken() {
   localStorage.setItem(TOKEN_KEY, val);
   localStorage.removeItem(GIST_KEY);
   setSyncState('ing', '连接中…');
-  const ok = await pullFromGist(true);
-  if (!ok) { await pushToGist(); }
+  // 先合并远端数据（本地不会丢），再把合并结果推上去
+  await pullFromGist(true);
+  await pushToGist();
   closeModal('settings-overlay');
 }
 
