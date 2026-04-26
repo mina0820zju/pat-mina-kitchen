@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pat and Mina 小厨房</title>
+  <style>
+    :root {
+      --bg: #faf7f2;
+      --primary: #d4715a;
+      --primary-hover: #bf5f49;
+      --primary-light: #f5c5b0;
+      --primary-pale: #fff3ef;
+      --text: #3a2a2a;
+      --text-muted: #a08070;
+      --border: #ede0d8;
+      --shadow: rgba(180,90,65,.10);
+      --shadow-hover: rgba(180,90,65,.20);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(140deg,#e07b60 0%,#c85c44 60%,#b84d38 100%);
+      padding: 36px 24px 56px; text-align: center;
+      position: relative; overflow: hidden;
+    }
+    .header::before,.header::after {
+      content:''; position:absolute; border-radius:50%; background:rgba(255,255,255,.07);
+    }
+    .header::before { width:260px;height:260px;top:-80px;right:-60px; }
+    .header::after  { width:200px;height:200px;bottom:-90px;left:-40px; }
+
+    .header-eyebrow { font-size:12px;letter-spacing:3px;color:rgba(255,255,255,.65);text-transform:uppercase;position:relative;z-index:1;margin-bottom:8px; }
+    .header-title   { color:white;font-size:30px;font-weight:800;letter-spacing:.5px;position:relative;z-index:1; }
+    .header-subtitle{ color:rgba(255,255,255,.72);font-size:14px;margin-top:7px;position:relative;z-index:1; }
+
+    .header-top { display:flex;align-items:flex-start;justify-content:flex-end;position:relative;z-index:1;margin-bottom:4px; }
+    .sync-badge {
+      background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3);
+      color:white; border-radius:20px; padding:4px 12px;
+      font-size:12px; cursor:pointer; display:flex;align-items:center;gap:5px;
+      transition:background .18s;
+    }
+    .sync-badge:hover { background:rgba(255,255,255,.28); }
+    .sync-dot { width:7px;height:7px;border-radius:50%; }
+    .sync-dot.ok  { background:#7ee87e; }
+    .sync-dot.off { background:rgba(255,255,255,.5); }
+    .sync-dot.err { background:#ff8888; }
+    .sync-dot.ing { background:#ffd077; animation:pulse .8s infinite alternate; }
+    @keyframes pulse { to { opacity:.4; } }
+
+    .header-stats { display:flex;justify-content:center;gap:40px;margin-top:20px;position:relative;z-index:1; }
+    .stat { color:white;text-align:center; }
+    .stat-num   { font-size:26px;font-weight:800;line-height:1; }
+    .stat-label { font-size:12px;opacity:.72;margin-top:3px; }
+
+    /* ── Main ── */
+    .main { max-width:1000px;margin:-28px auto 0;padding:0 16px 60px;position:relative;z-index:2; }
+
+    /* ── Buttons ── */
+    .btn {
+      border:none;border-radius:10px;padding:12px 18px;font-size:14px;font-weight:600;
+      cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;
+      justify-content:center;gap:5px;font-family:inherit;white-space:nowrap;
+    }
+    .btn-primary  { background:var(--primary);color:white; }
+    .btn-primary:hover { background:var(--primary-hover);transform:translateY(-1px);box-shadow:0 4px 14px var(--shadow-hover); }
+    .btn-secondary{ background:var(--primary-pale);color:var(--primary);border:1.5px solid var(--primary-light); }
+    .btn-secondary:hover { background:#ffe8e0; }
+    .btn-danger   { background:#fff2f2;color:#d44;border:1.5px solid #ffc8c8; }
+    .btn-danger:hover { background:#ffe0e0; }
+    .btn-ghost    { background:transparent;color:var(--text-muted);border:1.5px solid var(--border); }
+    .btn-ghost:hover { background:white; }
+
+    /* ── Action bar ── */
+    .action-bar {
+      background:white;border-radius:var(--radius);padding:14px 16px;
+      display:flex;gap:10px;box-shadow:0 4px 24px var(--shadow);margin-bottom:18px;
+    }
+
+    /* ── Category filter ── */
+    .category-filter { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px; }
+    .cat-pill {
+      padding:7px 15px;border-radius:20px;font-size:13px;font-weight:500;
+      cursor:pointer;border:1.5px solid var(--border);background:white;
+      color:var(--text-muted);transition:all .18s;user-select:none;
+    }
+    .cat-pill:hover { border-color:var(--primary-light);color:var(--primary); }
+    .cat-pill.active{ background:var(--primary);border-color:var(--primary);color:white; }
+
+    /* ── Cards ── */
+    .cards-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px; }
+    .dish-card {
+      background:white;border-radius:var(--radius);overflow:hidden;
+      box-shadow:0 2px 14px var(--shadow);cursor:pointer;transition:all .22s;
+    }
+    .dish-card:hover { transform:translateY(-5px);box-shadow:0 10px 32px var(--shadow-hover); }
+
+    .card-img-wrap {
+      width:100%;height:200px;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;
+    }
+    .card-photo { width:100%;height:100%;object-fit:contain;display:block;background:var(--bg); }
+    .card-placeholder { width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:52px; }
+
+    .card-body   { padding:14px 16px 16px; }
+    .card-name   { font-size:16px;font-weight:700;margin-bottom:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .card-meta   { display:flex;align-items:center;justify-content:space-between; }
+    .cat-badge   { font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px; }
+    .hearts-disp { font-size:14px;color:var(--primary);letter-spacing:.5px; }
+
+    /* ── Empty ── */
+    .empty-state { grid-column:1/-1;text-align:center;padding:80px 24px;color:var(--text-muted); }
+    .empty-icon  { font-size:64px;margin-bottom:14px; }
+    .empty-state h3 { font-size:17px;color:var(--text);margin-bottom:6px; }
+    .empty-state p  { font-size:14px; }
+
+    /* ── Overlay / Modal ── */
+    .overlay {
+      position:fixed;inset:0;background:rgba(30,15,10,.45);backdrop-filter:blur(5px);
+      z-index:200;display:flex;align-items:flex-end;justify-content:center;
+      opacity:0;pointer-events:none;transition:opacity .28s;
+    }
+    .overlay.open { opacity:1;pointer-events:all; }
+    @media(min-width:600px){ .overlay { align-items:center; } }
+
+    .modal {
+      background:white;border-radius:24px 24px 0 0;
+      width:100%;max-width:500px;max-height:92vh;overflow-y:auto;
+      transform:translateY(40px);
+      transition:transform .28s cubic-bezier(.34,1.3,.64,1);
+    }
+    @media(min-width:600px){ .modal { border-radius:24px;margin:16px; } }
+    .overlay.open .modal { transform:translateY(0); }
+
+    .modal-head {
+      padding:20px 20px 4px;display:flex;align-items:center;justify-content:space-between;
+      position:sticky;top:0;background:white;z-index:1;border-bottom:1px solid #f5ede8;
+    }
+    .modal-title { font-size:18px;font-weight:800; }
+    .modal-close {
+      width:30px;height:30px;border:none;background:#f5ede8;border-radius:50%;
+      cursor:pointer;font-size:16px;color:var(--text-muted);
+      display:flex;align-items:center;justify-content:center;transition:background .15s;
+    }
+    .modal-close:hover { background:#eaddd6; }
+    .modal-body { padding:20px; }
+
+    /* ── Form ── */
+    .form-group   { margin-bottom:18px; }
+    .form-label   { font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px;display:block; }
+    .form-input   { width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;color:var(--text);background:white;transition:border-color .18s;outline:none; }
+    .form-input:focus { border-color:var(--primary); }
+    .form-input.error { border-color:#e04444; }
+    textarea.form-input { resize:vertical;min-height:88px; }
+    select.form-input {
+      appearance:none;cursor:pointer;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a08070' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
+    }
+    .input-row { display:flex;gap:8px;margin-top:8px; }
+    .input-row .form-input { flex:1; }
+    .input-row .btn { flex-shrink:0;padding:11px 14px;font-size:13px; }
+    .form-actions { display:flex;gap:10px;margin-top:8px; }
+    .form-actions .btn { flex:1; }
+
+    /* Heart rating */
+    .heart-row { display:flex;gap:4px; }
+    .heart-btn {
+      font-size:28px;cursor:pointer;transition:transform .12s;user-select:none;
+      color:#ddd;line-height:1;background:none;border:none;padding:2px;
+    }
+    .heart-btn.on { color:var(--primary); }
+    .heart-btn:hover { transform:scale(1.25); }
+
+    /* Photo upload */
+    .photo-zone {
+      border:2px dashed var(--border);border-radius:12px;padding:24px;
+      text-align:center;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;
+    }
+    .photo-zone:hover { border-color:var(--primary-light);background:#fff8f5; }
+    .photo-zone input { position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
+    .photo-hint { font-size:13px;color:var(--text-muted);margin-top:6px; }
+    .photo-prev-img { width:100%;max-height:160px;object-fit:contain;border-radius:8px;display:block;background:var(--bg); }
+    .photo-clear-btn {
+      position:absolute;top:8px;right:8px;width:26px;height:26px;
+      background:rgba(0,0,0,.5);color:white;border:none;border-radius:50%;
+      cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;z-index:2;
+    }
+
+    /* ── Detail ── */
+    .detail-img-wrap {
+      width:100%;max-height:320px;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;
+      border-radius:14px;margin-bottom:20px;background:var(--bg);
+    }
+    .detail-photo { width:100%;max-height:320px;object-fit:contain;display:block; }
+    .detail-placeholder { width:100%;height:180px;border-radius:14px;margin-bottom:20px;display:flex;align-items:center;justify-content:center;font-size:72px; }
+    .detail-name  { font-size:26px;font-weight:800;margin-bottom:14px; }
+    .detail-field { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
+    .field-label  { font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);min-width:36px; }
+    .detail-notes { background:var(--bg);border-radius:12px;padding:14px;font-size:14px;line-height:1.75;margin-top:14px; }
+    .detail-actions { display:flex;gap:10px;margin-top:20px; }
+    .detail-actions .btn { flex:1; }
+
+    /* ── Random ── */
+    .random-wrap { text-align:center;padding:12px 0 8px; }
+    .random-img-wrap {
+      width:180px;height:180px;border-radius:50%;overflow:hidden;
+      border:4px solid var(--primary-light);margin:0 auto 4px;
+      display:flex;align-items:center;justify-content:center;background:var(--bg);
+    }
+    .random-img { width:100%;height:100%;object-fit:contain;display:block; }
+    .random-placeholder { width:180px;height:180px;border-radius:50%;border:4px solid var(--primary-light);margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:64px; }
+    .random-name   { font-size:26px;font-weight:800;color:var(--primary);margin:14px 0 4px; }
+    .random-cat    { font-size:13px;color:var(--text-muted);margin-bottom:6px; }
+    .random-rating { font-size:20px;color:var(--primary);letter-spacing:3px; }
+    .pop-in { animation:popIn .38s cubic-bezier(.34,1.5,.64,1) both; }
+    @keyframes popIn { from{transform:scale(.6);opacity:0;} to{transform:scale(1);opacity:1;} }
+    .random-actions { display:flex;gap:10px;margin-top:20px; }
+    .random-actions .btn { flex:1; }
+
+    /* ── Settings modal ── */
+    .settings-section { margin-bottom:24px; }
+    .settings-section-title { font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px; }
+    .status-card {
+      background:var(--bg);border-radius:12px;padding:14px 16px;
+      display:flex;align-items:center;gap:12px;margin-bottom:16px;
+    }
+    .status-icon { font-size:22px;flex-shrink:0; }
+    .status-text { font-size:13px;line-height:1.5; }
+    .status-text strong { display:block;margin-bottom:2px; }
+    .token-wrap { position:relative; }
+    .token-toggle {
+      position:absolute;right:12px;top:50%;transform:translateY(-50%);
+      background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;
+      padding:4px;
+    }
+    .guide-steps { background:var(--bg);border-radius:12px;padding:14px 16px;font-size:13px;line-height:2; }
+    .guide-steps ol { padding-left:18px; }
+    .guide-steps a { color:var(--primary); }
+    .settings-actions { display:flex;gap:10px;margin-top:8px; }
+    .settings-actions .btn { flex:1; }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position:fixed;inset:0;background:var(--bg);z-index:999;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+      transition:opacity .4s;
+    }
+    .loading-overlay.hidden { opacity:0;pointer-events:none; }
+    .loading-spinner {
+      width:40px;height:40px;border:3px solid var(--primary-light);
+      border-top-color:var(--primary);border-radius:50%;
+      animation:spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-text { font-size:14px;color:var(--text-muted); }
+
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">正在从云端同步数据…</div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-top">
+    <div class="sync-badge" onclick="openModal('settings-overlay')" title="同步设置">
+      <div class="sync-dot off" id="sync-dot"></div>
+      <span id="sync-label">同步设置</span>
+    </div>
+  </div>
+  <div class="header-eyebrow">Our Kitchen</div>
+  <div class="header-title">🍳 Pat and Mina 小厨房</div>
+  <div class="header-subtitle">记录每一道爱的料理</div>
+  <div class="header-stats">
+    <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">道菜</div></div>
+    <div class="stat"><div class="stat-num" id="stat-cats">0</div><div class="stat-label">种分类</div></div>
+    <div class="stat"><div class="stat-num" id="stat-avg">—</div><div class="stat-label">平均评分</div></div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="action-bar">
+    <button class="btn btn-secondary" onclick="showRandom()">🎲 今天吃什么</button>
+    <button class="btn btn-primary" onclick="openAdd()">＋ 记录新菜</button>
+  </div>
+  <div class="category-filter" id="cat-filter"></div>
+  <div class="cards-grid" id="cards-grid"></div>
+</div>
+
+<!-- ── Add / Edit Modal ── -->
+<div class="overlay" id="form-overlay" onclick="overlayClick(event,'form-overlay')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="form-title">记录新菜</div>
+      <button class="modal-close" onclick="closeModal('form-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">菜名</label>
+        <input id="f-name" class="form-input" placeholder="输入菜名…" maxlength="40">
+      </div>
+      <div class="form-group">
+        <label class="form-label">分类</label>
+        <select id="f-cat" class="form-input"></select>
+        <div class="input-row">
+          <input id="f-newcat" class="form-input" placeholder="自定义新分类…" maxlength="20">
+          <button class="btn btn-secondary" onclick="addCat()">+ 添加</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">评分</label>
+        <div class="heart-row" id="heart-row">
+          <button class="heart-btn" type="button" onclick="setRating(1)">♡</button>
+          <button class="heart-btn" type="button" onclick="setRating(2)">♡</button>
+          <button class="heart-btn" type="button" onclick="setRating(3)">♡</button>
+          <button class="heart-btn" type="button" onclick="setRating(4)">♡</button>
+          <button class="heart-btn" type="button" onclick="setRating(5)">♡</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea id="f-notes" class="form-input" placeholder="口感、食材、特别的故事…"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">照片</label>
+        <div class="photo-zone" id="photo-zone">
+          <input type="file" accept="image/*" id="photo-input" onchange="onPhoto(event)">
+          <div id="photo-hint-block">
+            <div style="font-size:30px">📷</div>
+            <div class="photo-hint">点击上传照片</div>
+          </div>
+          <img id="photo-prev" class="photo-prev-img" style="display:none">
+          <button class="photo-clear-btn" id="photo-clear-btn" style="display:none" type="button" onclick="clearPhoto(event)">✕</button>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" type="button" onclick="closeModal('form-overlay')">取消</button>
+        <button class="btn btn-primary" type="button" onclick="saveDish()" style="flex:2">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Detail Modal ── -->
+<div class="overlay" id="detail-overlay" onclick="overlayClick(event,'detail-overlay')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">菜品详情</div>
+      <button class="modal-close" onclick="closeModal('detail-overlay')">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ── Random Modal ── -->
+<div class="overlay" id="random-overlay" onclick="overlayClick(event,'random-overlay')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">今天就吃这个！</div>
+      <button class="modal-close" onclick="closeModal('random-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="random-wrap" id="random-wrap"></div>
+      <div class="random-actions">
+        <button class="btn btn-secondary" onclick="showRandom(true)">🎲 换一个</button>
+        <button class="btn btn-primary" onclick="closeModal('random-overlay')">就吃这个！</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings Modal ── -->
+<div class="overlay" id="settings-overlay" onclick="overlayClick(event,'settings-overlay')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">☁️ 同步设置</div>
+      <button class="modal-close" onclick="closeModal('settings-overlay')">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="settings-section">
+        <div class="settings-section-title">当前状态</div>
+        <div class="status-card" id="settings-status-card">
+          <div class="status-icon" id="settings-status-icon">⚪</div>
+          <div class="status-text" id="settings-status-text">
+            <strong>未配置</strong>填写下方 Token 后即可在所有设备间同步数据。
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">GitHub Personal Access Token</div>
+        <div class="token-wrap">
+          <input id="s-token" class="form-input" type="password" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+          <button class="token-toggle" type="button" onclick="toggleToken()" id="token-eye">👁</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:7px;line-height:1.7">
+          Token 仅存储在本地设备，不会上传给任何第三方。
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">如何获取 Token？</div>
+        <div class="guide-steps">
+          <ol>
+            <li>访问 <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Tokens</a></li>
+            <li>Note 填任意名字，如 <strong>小厨房</strong></li>
+            <li>Expiration 选 <strong>No expiration</strong></li>
+            <li>勾选 <strong>gist</strong> 权限</li>
+            <li>点 Generate token，复制粘贴到上方</li>
+          </ol>
+        </div>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn btn-ghost" type="button" onclick="clearSync()">清除配置</button>
+        <button class="btn btn-secondary" type="button" onclick="pullFromGist()">从云端同步</button>
+        <button class="btn btn-primary" type="button" onclick="saveToken()">保存并连接</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   Storage & DB
+═══════════════════════════════════════ */
+const KEY       = 'patmina_v1';
+const TOKEN_KEY = 'patmina_gh_token';
+const GIST_KEY  = 'patmina_gist_id';
+const DEFAULT_CATS = ['家常菜','汤品','早午餐','面食主食','凉拌菜','甜点','节日特餐','其他'];
+
+function dbLoad() {
+  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d) return d; } catch {}
+  return { dishes: [], cats: [...DEFAULT_CATS] };
+}
+function dbSave() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+let db = dbLoad();
+
+/* ═══════════════════════════════════════
+   GitHub Gist Sync
+═══════════════════════════════════════ */
+const GIST_FILENAME = 'pat-mina-kitchen.json';
+const GIST_DESC     = 'Pat and Mina 小厨房数据';
+
+function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+function getGistId() { return localStorage.getItem(GIST_KEY) || ''; }
+
+async function ghFetch(url, opts = {}) {
+  const token = getToken();
+  return fetch(url, {
+    ...opts,
+    headers: {
+      'Authorization': `token ${token}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+}
+
+async function findGist() {
+  const res  = await ghFetch('https://api.github.com/gists?per_page=100');
+  if (!res.ok) return null;
+  const list = await res.json();
+  return list.find(g => g.description === GIST_DESC && g.files[GIST_FILENAME])?.id || null;
+}
+
+async function pushToGist() {
+  const token = getToken(); if (!token) return;
+  setSyncState('ing', '同步中…');
+  try {
+    let gistId = getGistId();
+    const body = JSON.stringify({
+      description: GIST_DESC,
+      public: false,
+      files: { [GIST_FILENAME]: { content: JSON.stringify(db) } }
+    });
+    if (gistId) {
+      const r = await ghFetch(`https://api.github.com/gists/${gistId}`, { method:'PATCH', body });
+      if (!r.ok) throw new Error(r.status);
+    } else {
+      const r   = await ghFetch('https://api.github.com/gists', { method:'POST', body });
+      if (!r.ok) throw new Error(r.status);
+      const data = await r.json();
+      localStorage.setItem(GIST_KEY, data.id);
+    }
+    setSyncState('ok', '已同步');
+  } catch(e) {
+    setSyncState('err', '同步失败');
+  }
+}
+
+async function pullFromGist(silent = false) {
+  const token = getToken(); if (!token) return false;
+  if (!silent) setSyncState('ing', '同步中…');
+  try {
+    let gistId = getGistId();
+    if (!gistId) { gistId = await findGist(); if (gistId) localStorage.setItem(GIST_KEY, gistId); }
+    if (!gistId) { setSyncState('ok', '已连接（无数据）'); return false; }
+    const res  = await ghFetch(`https://api.github.com/gists/${gistId}`);
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const raw  = data.files[GIST_FILENAME]?.content;
+    if (raw) { db = JSON.parse(raw); dbSave(); render(); }
+    setSyncState('ok', '已同步');
+    updateSettingsStatus('ok');
+    return true;
+  } catch(e) {
+    setSyncState('err', '同步失败');
+    updateSettingsStatus('err');
+    return false;
+  }
+}
+
+async function saveToken() {
+  const val = document.getElementById('s-token').value.trim();
+  if (!val) return;
+  localStorage.setItem(TOKEN_KEY, val);
+  localStorage.removeItem(GIST_KEY);
+  setSyncState('ing', '连接中…');
+  const ok = await pullFromGist(true);
+  if (!ok) { await pushToGist(); }
+  closeModal('settings-overlay');
+}
+
+function clearSync() {
+  if (!confirm('清除同步配置？本地数据不会删除。')) return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(GIST_KEY);
+  setSyncState('off', '同步设置');
+  updateSettingsStatus('off');
+  document.getElementById('s-token').value = '';
+}
+
+/* ═══════════════════════════════════════
+   Sync UI
+═══════════════════════════════════════ */
+function setSyncState(state, label) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot ' + state;
+  document.getElementById('sync-label').textContent = label;
+}
+
+function updateSettingsStatus(state) {
+  const icon = document.getElementById('settings-status-icon');
+  const text = document.getElementById('settings-status-text');
+  if (state === 'ok') {
+    icon.textContent = '✅';
+    text.innerHTML  = '<strong>已连接</strong>数据将在所有设备间自动同步。';
+  } else if (state === 'err') {
+    icon.textContent = '❌';
+    text.innerHTML  = '<strong>连接失败</strong>请检查 Token 是否正确，或网络是否可用。';
+  } else {
+    icon.textContent = '⚪';
+    text.innerHTML  = '<strong>未配置</strong>填写下方 Token 后即可在所有设备间同步数据。';
+  }
+}
+
+function toggleToken() {
+  const el = document.getElementById('s-token');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+/* ═══════════════════════════════════════
+   Image Compression
+═══════════════════════════════════════ */
+function compressImage(dataUrl, maxPx = 1200, quality = 0.80) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxPx || h > maxPx) {
+        if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx; }
+        else        { w = Math.round(w * maxPx / h); h = maxPx; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/* ═══════════════════════════════════════
+   Category helpers
+═══════════════════════════════════════ */
+const PALETTE = [
+  ['#fde8df','#d4715a'],['#dff5e8','#3a9e6a'],['#e4eeff','#4a72d4'],
+  ['#fef5dd','#c08820'],['#f0e4ff','#8855cc'],['#e0f7f7','#2a9090'],
+  ['#ffe4f0','#cc5580'],['#f0f0f0','#888'],
+];
+function catColors(cat) {
+  const idx = db.cats.indexOf(cat);
+  return PALETTE[(idx < 0 ? 0 : idx) % PALETTE.length];
+}
+function catEmoji(cat) {
+  return {'家常菜':'🥘','汤品':'🍲','早午餐':'🍳','面食主食':'🍜',
+          '凉拌菜':'🥗','甜点':'🍮','节日特餐':'🎉'}[cat] || '🍽️';
+}
+function catGradient(cat) {
+  const idx = db.cats.indexOf(cat) < 0 ? 0 : db.cats.indexOf(cat);
+  return [
+    'linear-gradient(135deg,#fde8df,#f5c5b0)',
+    'linear-gradient(135deg,#d0f0e0,#a8e0c0)',
+    'linear-gradient(135deg,#d8e8ff,#b0c8f8)',
+    'linear-gradient(135deg,#fef0cc,#f8d888)',
+    'linear-gradient(135deg,#ecdcff,#d0a8f8)',
+    'linear-gradient(135deg,#ccf0f0,#88d8d8)',
+    'linear-gradient(135deg,#ffd8e8,#f8a8c8)',
+    'linear-gradient(135deg,#e8e8e8,#c8c8c8)',
+  ][idx % 8];
+}
+
+/* ═══════════════════════════════════════
+   Hearts render
+═══════════════════════════════════════ */
+function renderHearts(n, size = 14) {
+  return Array.from({length:5},(_,i)=>
+    `<span style="color:${i<n?'#d4715a':'#ddd'};font-size:${size}px">${i<n?'♥':'♡'}</span>`
+  ).join('');
+}
+
+/* ═══════════════════════════════════════
+   Stats
+═══════════════════════════════════════ */
+function renderStats() {
+  document.getElementById('stat-total').textContent = db.dishes.length;
+  document.getElementById('stat-cats').textContent  = new Set(db.dishes.map(d=>d.cat).filter(Boolean)).size;
+  const rated = db.dishes.filter(d => d.rating > 0);
+  document.getElementById('stat-avg').textContent   =
+    rated.length ? (rated.reduce((s,d)=>s+d.rating,0)/rated.length).toFixed(1) : '—';
+}
+
+/* ═══════════════════════════════════════
+   Filter & Cards
+═══════════════════════════════════════ */
+let filterCat = '全部';
+
+function renderFilter() {
+  document.getElementById('cat-filter').innerHTML =
+    ['全部',...db.cats].map(c=>
+      `<div class="cat-pill${filterCat===c?' active':''}" onclick="setCat('${c}')">${c}</div>`
+    ).join('');
+}
+
+function setCat(c) { filterCat = c; render(); }
+
+function renderCards() {
+  const dishes = filterCat === '全部' ? db.dishes : db.dishes.filter(d=>d.cat===filterCat);
+  const grid   = document.getElementById('cards-grid');
+  if (!dishes.length) {
+    grid.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">${filterCat==='全部'?'🍽️':catEmoji(filterCat)}</div>
+      <h3>${filterCat==='全部'?'还没有记录任何菜':'这个分类还没有菜'}</h3>
+      <p>${filterCat==='全部'?'点击「记录新菜」开始吧～':'换个分类看看？'}</p>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = dishes.map(d => {
+    const [bg,fg] = catColors(d.cat||'其他');
+    return `<div class="dish-card" onclick="openDetail('${d.id}')">
+      <div class="card-img-wrap" style="${d.photo?'':'background:'+catGradient(d.cat)}">
+        ${d.photo
+          ? `<img class="card-photo" src="${d.photo}" alt="${d.name}" loading="lazy">`
+          : `<div class="card-placeholder">${catEmoji(d.cat)}</div>`}
+      </div>
+      <div class="card-body">
+        <div class="card-name">${d.name}</div>
+        <div class="card-meta">
+          <span class="cat-badge" style="background:${bg};color:${fg}">${d.cat||'未分类'}</span>
+          <span class="hearts-disp">${renderHearts(d.rating,13)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function render() { renderStats(); renderFilter(); renderCards(); }
+
+/* ═══════════════════════════════════════
+   Detail
+═══════════════════════════════════════ */
+function openDetail(id) {
+  const d = db.dishes.find(x=>x.id===id); if (!d) return;
+  const [bg,fg] = catColors(d.cat||'其他');
+  document.getElementById('detail-body').innerHTML = `
+    ${d.photo
+      ? `<div class="detail-img-wrap"><img class="detail-photo" src="${d.photo}" alt="${d.name}"></div>`
+      : `<div class="detail-placeholder" style="background:${catGradient(d.cat)}">${catEmoji(d.cat)}</div>`}
+    <div class="detail-name">${d.name}</div>
+    <div class="detail-field">
+      <span class="field-label">分类</span>
+      <span class="cat-badge" style="background:${bg};color:${fg};font-size:12px;padding:4px 12px">${d.cat||'未分类'}</span>
+    </div>
+    <div class="detail-field">
+      <span class="field-label">评分</span>
+      <span style="font-size:20px;letter-spacing:2px">${renderHearts(d.rating,18)}</span>
+    </div>
+    ${d.notes?`<div class="detail-notes">${d.notes.replace(/\n/g,'<br>')}</div>`:''}
+    <div class="detail-actions">
+      <button class="btn btn-secondary" type="button" onclick="openEdit('${d.id}')">编辑</button>
+      <button class="btn btn-danger"    type="button" onclick="delDish('${d.id}')">删除</button>
+    </div>`;
+  openModal('detail-overlay');
+}
+
+/* ═══════════════════════════════════════
+   Add / Edit form
+═══════════════════════════════════════ */
+let formRating = 0;
+let formPhoto  = null;
+let editId     = null;
+
+function openAdd() {
+  editId = null; formRating = 0; formPhoto = null;
+  document.getElementById('form-title').textContent = '记录新菜';
+  document.getElementById('f-name').value  = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('f-newcat').value = '';
+  resetPhotoUI();
+  populateCatSelect('');
+  refreshHearts();
+  openModal('form-overlay');
+}
+
+function openEdit(id) {
+  const d = db.dishes.find(x=>x.id===id); if (!d) return;
+  editId = id; formRating = d.rating||0; formPhoto = d.photo||null;
+  document.getElementById('form-title').textContent = '编辑菜品';
+  document.getElementById('f-name').value  = d.name;
+  document.getElementById('f-notes').value = d.notes||'';
+  document.getElementById('f-newcat').value = '';
+  populateCatSelect(d.cat||'');
+  if (d.photo) {
+    document.getElementById('photo-prev').src = d.photo;
+    document.getElementById('photo-prev').style.display      = 'block';
+    document.getElementById('photo-hint-block').style.display= 'none';
+    document.getElementById('photo-clear-btn').style.display = 'flex';
+  } else {
+    resetPhotoUI();
+  }
+  refreshHearts();
+  closeModal('detail-overlay');
+  openModal('form-overlay');
+}
+
+function populateCatSelect(sel) {
+  document.getElementById('f-cat').innerHTML =
+    '<option value="">选择分类…</option>' +
+    db.cats.map(c=>`<option value="${c}"${c===sel?' selected':''}>${c}</option>`).join('');
+}
+
+function addCat() {
+  const v = document.getElementById('f-newcat').value.trim(); if (!v) return;
+  if (!db.cats.includes(v)) { db.cats.push(v); dbSave(); }
+  populateCatSelect(v);
+  document.getElementById('f-newcat').value = '';
+}
+
+function setRating(n) { formRating = n; refreshHearts(); }
+function refreshHearts() {
+  document.querySelectorAll('#heart-row .heart-btn').forEach((b,i) => {
+    b.textContent = i < formRating ? '♥' : '♡';
+    b.classList.toggle('on', i < formRating);
+  });
+}
+
+async function onPhoto(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = async ev => {
+    formPhoto = await compressImage(ev.target.result);
+    document.getElementById('photo-prev').src             = formPhoto;
+    document.getElementById('photo-prev').style.display   = 'block';
+    document.getElementById('photo-hint-block').style.display = 'none';
+    document.getElementById('photo-clear-btn').style.display  = 'flex';
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearPhoto(e) {
+  e.stopPropagation(); e.preventDefault();
+  formPhoto = null; resetPhotoUI();
+  document.getElementById('photo-input').value = '';
+}
+
+function resetPhotoUI() {
+  document.getElementById('photo-prev').style.display       = 'none';
+  document.getElementById('photo-hint-block').style.display = 'block';
+  document.getElementById('photo-clear-btn').style.display  = 'none';
+}
+
+function saveDish() {
+  const nameEl = document.getElementById('f-name');
+  const name   = nameEl.value.trim();
+  if (!name) {
+    nameEl.classList.add('error');
+    nameEl.focus();
+    setTimeout(() => nameEl.classList.remove('error'), 1500);
+    return;
+  }
+  const dish = {
+    id:     editId || (Date.now().toString(36) + Math.random().toString(36).slice(2)),
+    name,
+    cat:    document.getElementById('f-cat').value || '其他',
+    rating: formRating,
+    notes:  document.getElementById('f-notes').value.trim(),
+    photo:  formPhoto,
+  };
+  if (editId) {
+    const i = db.dishes.findIndex(x=>x.id===editId);
+    if (i >= 0) db.dishes[i] = dish;
+  } else {
+    db.dishes.unshift(dish);
+  }
+  dbSave();
+  closeModal('form-overlay');
+  render();
+  pushToGist();
+}
+
+function delDish(id) {
+  if (!confirm('确定要删除这道菜吗？')) return;
+  db.dishes = db.dishes.filter(x=>x.id!==id);
+  dbSave();
+  closeModal('detail-overlay');
+  render();
+  pushToGist();
+}
+
+/* ═══════════════════════════════════════
+   Random
+═══════════════════════════════════════ */
+function showRandom(reroll) {
+  const pool = filterCat === '全部' ? db.dishes : db.dishes.filter(d=>d.cat===filterCat);
+  if (!pool.length) { alert('还没有记录任何菜，先添加几道吧～'); return; }
+  const d = pool[Math.floor(Math.random() * pool.length)];
+  document.getElementById('random-wrap').innerHTML = `
+    <div class="pop-in" style="display:contents">
+      ${d.photo
+        ? `<div class="random-img-wrap"><img class="random-img" src="${d.photo}" alt="${d.name}"></div>`
+        : `<div class="random-placeholder" style="background:${catGradient(d.cat)}">${catEmoji(d.cat)}</div>`}
+      <div class="random-name">${d.name}</div>
+      <div class="random-cat">${d.cat||''}</div>
+      <div class="random-rating">${renderHearts(d.rating, 20)}</div>
+      ${d.notes?`<div style="font-size:13px;color:var(--text-muted);margin-top:10px;line-height:1.6">${d.notes.replace(/\n/g,'<br>')}</div>`:''}
+    </div>`;
+  if (!reroll) openModal('random-overlay');
+}
+
+/* ═══════════════════════════════════════
+   Modal helpers
+═══════════════════════════════════════ */
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function overlayClick(e, id) { if (e.target.id === id) closeModal(id); }
+
+/* ═══════════════════════════════════════
+   Init
+═══════════════════════════════════════ */
+async function init() {
+  const token = getToken();
+  if (token) {
+    setSyncState('ing', '同步中…');
+    updateSettingsStatus('ok');
+    document.getElementById('s-token').value = token;
+    await pullFromGist(true);
+  } else {
+    setSyncState('off', '同步设置');
+  }
+  document.getElementById('loading').classList.add('hidden');
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
