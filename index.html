@@ -420,6 +420,18 @@
       </div>
 
       <div class="settings-section">
+        <div class="settings-section-title">Gist ID <span style="font-weight:400;text-transform:none;letter-spacing:0">（多设备同步必填）</span></div>
+        <div style="display:flex;gap:8px;">
+          <input id="s-gist-id" class="form-input" placeholder="自动填入，或从其他设备复制" style="flex:1;font-size:13px;font-family:monospace">
+          <button class="btn btn-secondary" type="button" onclick="copyGistId()" style="flex-shrink:0;padding:11px 14px;font-size:13px">复制</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:7px;line-height:1.7">
+          第一台设备连接后会自动生成此 ID。<br>
+          在新设备上：先填 Token，再把上面的 ID 粘贴过来，确保所有设备读写同一份数据。
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-section-title">如何获取 Token？</div>
         <div class="guide-steps">
           <ol>
@@ -548,15 +560,36 @@ async function pullFromGist(silent = false) {
 }
 
 async function saveToken() {
-  const val = document.getElementById('s-token').value.trim();
+  const val    = document.getElementById('s-token').value.trim();
+  const gistId = document.getElementById('s-gist-id').value.trim();
   if (!val) return;
   localStorage.setItem(TOKEN_KEY, val);
-  localStorage.removeItem(GIST_KEY);
+  // 如果手动填了 Gist ID，直接用，跳过自动搜索
+  if (gistId) {
+    localStorage.setItem(GIST_KEY, gistId);
+  } else {
+    localStorage.removeItem(GIST_KEY);
+  }
   setSyncState('ing', '连接中…');
-  // 先合并远端数据（本地不会丢），再把合并结果推上去
   await pullFromGist(true);
   await pushToGist();
+  // 同步后把最新 Gist ID 回填到输入框
+  const storedId = getGistId();
+  if (storedId) document.getElementById('s-gist-id').value = storedId;
   closeModal('settings-overlay');
+}
+
+function copyGistId() {
+  const id = getGistId();
+  if (!id) { alert('尚未生成 Gist ID，请先保存并连接。'); return; }
+  navigator.clipboard.writeText(id).then(
+    () => alert('Gist ID 已复制，粘贴到其他设备的同步设置中即可。'),
+    () => {
+      // 降级：选中文本手动复制
+      const el = document.getElementById('s-gist-id');
+      el.select(); el.setSelectionRange(0, 99);
+    }
+  );
 }
 
 function clearSync() {
@@ -945,6 +978,8 @@ async function init() {
     setSyncState('ing', '同步中…');
     updateSettingsStatus('ok');
     document.getElementById('s-token').value = token;
+    const storedGistId = getGistId();
+    if (storedGistId) document.getElementById('s-gist-id').value = storedGistId;
     await pullFromGist(true);
   } else {
     setSyncState('off', '同步设置');
