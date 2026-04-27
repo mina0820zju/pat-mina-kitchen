@@ -300,6 +300,10 @@
   <div class="action-bar">
     <button class="btn btn-secondary" onclick="showRandom()">🎲 今天吃什么</button>
     <button class="btn btn-primary" onclick="openAdd()">＋ 记录新菜</button>
+    <button class="btn btn-ghost" onclick="exportData()" title="导出数据" style="padding:12px 13px;flex-shrink:0">⬆</button>
+    <label class="btn btn-ghost" title="导入数据" style="padding:12px 13px;flex-shrink:0;cursor:pointer">
+      ⬇<input type="file" accept=".json" onchange="importData(event)" style="display:none">
+    </label>
   </div>
   <div class="category-filter" id="cat-filter"></div>
   <div class="cards-grid" id="cards-grid"></div>
@@ -419,17 +423,6 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">Gist ID <span style="font-weight:400;text-transform:none;letter-spacing:0">（多设备同步必填）</span></div>
-        <div style="display:flex;gap:8px;">
-          <input id="s-gist-id" class="form-input" placeholder="自动填入，或从其他设备复制" style="flex:1;font-size:13px;font-family:monospace">
-          <button class="btn btn-secondary" type="button" onclick="copyGistId()" style="flex-shrink:0;padding:11px 14px;font-size:13px">复制</button>
-        </div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:7px;line-height:1.7">
-          第一台设备连接后会自动生成此 ID。<br>
-          在新设备上：先填 Token，再把上面的 ID 粘贴过来，确保所有设备读写同一份数据。
-        </div>
-      </div>
 
       <div class="settings-section">
         <div class="settings-section-title">如何获取 Token？</div>
@@ -438,18 +431,18 @@
             <li>访问 <a href="https://github.com/settings/tokens/new" target="_blank">github.com → Settings → Tokens</a></li>
             <li>Note 填任意名字，如 <strong>小厨房</strong></li>
             <li>Expiration 选 <strong>No expiration</strong></li>
-            <li>勾选 <strong>gist</strong> 权限</li>
+            <li>勾选 <strong>public_repo</strong> 权限</li>
             <li>点 Generate token，复制粘贴到上方</li>
           </ol>
         </div>
       </div>
 
       <div class="settings-actions">
-        <button class="btn btn-ghost" type="button" onclick="clearSync()">清除配置</button>
-        <button class="btn btn-secondary" type="button" onclick="pullFromGist()">合并云端数据</button>
-        <button class="btn btn-primary" type="button" onclick="saveToken()">保存并连接</button>
+        <button class="btn btn-ghost"      type="button" onclick="clearSync()">清除配置</button>
+        <button class="btn btn-secondary"  type="button" onclick="syncOnLoad()">从云端同步</button>
+        <button class="btn btn-primary"    type="button" onclick="saveToken()">保存并连接</button>
       </div>
-      <button class="btn btn-danger" type="button" onclick="forceOverwriteFromGist()"
+      <button class="btn btn-danger" type="button" onclick="forceFromRepo()"
               style="width:100%;margin-top:8px;font-size:13px">
         ⬇ 强制从云端获取（覆盖本地）
       </button>
@@ -475,60 +468,32 @@ function dbSave() { localStorage.setItem(KEY, JSON.stringify(db)); }
 let db = dbLoad();
 
 /* ═══════════════════════════════════════
-   GitHub Gist Sync
+   GitHub Repo Sync
+   数据存在仓库的 kitchen-data.json
+   读取：raw.githubusercontent.com（无需 Token）
+   写入：Contents API（需要 public_repo 权限的 Token）
 ═══════════════════════════════════════ */
-const GIST_FILENAME = 'pat-mina-kitchen.json';
-const GIST_DESC     = 'Pat and Mina 小厨房数据';
+const REPO_OWNER = 'mina0820zju';
+const REPO_NAME  = 'pat-mina-kitchen';
+const DATA_FILE  = 'kitchen-data.json';
+const RAW_URL    = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${DATA_FILE}`;
+const API_URL    = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DATA_FILE}`;
 
 function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
-function getGistId() { return localStorage.getItem(GIST_KEY) || ''; }
+
+function b64enc(str) { return btoa(unescape(encodeURIComponent(str))); }
+function b64dec(b64) { return decodeURIComponent(escape(atob(b64.replace(/\n/g, '')))); }
 
 async function ghFetch(url, opts = {}) {
   const token = getToken();
   return fetch(url, {
     ...opts,
     headers: {
-      'Authorization': `token ${token}`,
+      ...(token ? { 'Authorization': `token ${token}` } : {}),
       'Content-Type': 'application/json',
       ...(opts.headers || {}),
     },
   });
-}
-
-async function findGist() {
-  const res  = await ghFetch('https://api.github.com/gists?per_page=100');
-  if (!res.ok) return null;
-  const list = await res.json();
-  return list.find(g => g.description === GIST_DESC && g.files[GIST_FILENAME])?.id || null;
-}
-
-async function pushToGist() {
-  const token = getToken(); if (!token) return;
-  setSyncState('ing', '同步中…');
-  try {
-    let gistId = getGistId();
-    const content = JSON.stringify(db);
-    const body = JSON.stringify({
-      description: GIST_DESC,
-      public: false,
-      files: { [GIST_FILENAME]: { content } }
-    });
-    if (gistId) {
-      const r = await ghFetch(`https://api.github.com/gists/${gistId}`, { method:'PATCH', body });
-      if (!r.ok) throw new Error(`推送失败（${r.status}）`);
-    } else {
-      const r = await ghFetch('https://api.github.com/gists', { method:'POST', body });
-      if (!r.ok) throw new Error(`创建失败（${r.status}）`);
-      const data = await r.json();
-      localStorage.setItem(GIST_KEY, data.id);
-      // 回填 Gist ID 到设置框
-      const el = document.getElementById('s-gist-id');
-      if (el) el.value = data.id;
-    }
-    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
-  } catch(e) {
-    setSyncState('err', e.message || '同步失败');
-  }
 }
 
 /* 合并两个 db：local 优先，remote 中多出的菜补充进来 */
@@ -542,110 +507,119 @@ function mergeDb(local, remote) {
   return { dishes, cats };
 }
 
-async function pullFromGist(silent = false) {
-  const token = getToken(); if (!token) return false;
-  if (!silent) setSyncState('ing', '同步中…');
-  try {
-    let gistId = getGistId();
-    if (!gistId) { gistId = await findGist(); if (gistId) localStorage.setItem(GIST_KEY, gistId); }
-    if (!gistId) { setSyncState('ok', '已连接（无数据）'); return false; }
-    const res  = await ghFetch(`https://api.github.com/gists/${gistId}`);
-    if (!res.ok) {
-      const msg = res.status === 401 ? 'Token 无效或已过期（401）'
-                : res.status === 404 ? 'Gist ID 不存在（404）'
-                : `请求失败（${res.status}）`;
-      throw new Error(msg);
-    }
-    const data     = await res.json();
-    const fileInfo = data.files[GIST_FILENAME];
-    let raw = fileInfo?.content;
-
-    // GitHub API 对超过 1MB 的文件会截断，需从 raw_url 读完整内容
-    if (fileInfo?.truncated && fileInfo?.raw_url) {
-      const rawRes = await fetch(fileInfo.raw_url);
-      if (!rawRes.ok) throw new Error(`读取完整数据失败（${rawRes.status}）`);
-      raw = await rawRes.text();
-    }
-
-    if (raw) {
-      db = mergeDb(db, JSON.parse(raw));
-      dbSave(); render();
-    }
-    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
-    updateSettingsStatus('ok');
-    return true;
-  } catch(e) {
-    const msg = e.message || '网络错误';
-    setSyncState('err', '同步失败');
-    updateSettingsStatus('err', msg);
-    return false;
-  }
+/* 从仓库读取数据（不需要 Token） */
+async function readFromRepo() {
+  const res = await fetch(RAW_URL + '?t=' + Date.now()); // 加时间戳避免缓存
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`读取失败（${res.status}）`);
+  return await res.json();
 }
 
-async function saveToken() {
-  const val    = document.getElementById('s-token').value.trim();
-  const gistId = document.getElementById('s-gist-id').value.trim();
-  if (!val) return;
-  localStorage.setItem(TOKEN_KEY, val);
-  // 如果手动填了 Gist ID，直接用，跳过自动搜索
-  if (gistId) {
-    localStorage.setItem(GIST_KEY, gistId);
-  } else {
-    localStorage.removeItem(GIST_KEY);
-  }
-  setSyncState('ing', '连接中…');
-  await pullFromGist(true);
-  await pushToGist();
-  // 同步后把最新 Gist ID 回填到输入框
-  const storedId = getGistId();
-  if (storedId) document.getElementById('s-gist-id').value = storedId;
-  closeModal('settings-overlay');
-}
-
-async function forceOverwriteFromGist() {
-  if (!confirm('确定用云端数据完全覆盖本地？本地独有的菜将会丢失。')) return;
-  const token = getToken(); if (!token) return;
+/* 把当前 db 写入仓库（需要 Token） */
+async function writeToRepo() {
+  const token = getToken();
+  if (!token) { setSyncState('off', '配置 Token 后可写入'); return; }
   setSyncState('ing', '同步中…');
-  closeModal('settings-overlay');
   try {
-    let gistId = getGistId();
-    if (!gistId) { gistId = await findGist(); if (gistId) localStorage.setItem(GIST_KEY, gistId); }
-    if (!gistId) { setSyncState('err', '未找到 Gist'); return; }
-    const res = await ghFetch(`https://api.github.com/gists/${gistId}`);
-    if (!res.ok) throw new Error(`请求失败（${res.status}）`);
-    const data     = await res.json();
-    const fileInfo = data.files[GIST_FILENAME];
-    let raw = fileInfo?.content;
-    if (fileInfo?.truncated && fileInfo?.raw_url) {
-      const rawRes = await fetch(fileInfo.raw_url);
-      raw = await rawRes.text();
+    // 先获取文件当前的 SHA（更新时必需）
+    let sha;
+    const getRes = await ghFetch(API_URL);
+    if (getRes.ok) {
+      sha = (await getRes.json()).sha;
+    } else if (getRes.status === 401) {
+      throw new Error('Token 无效或已过期（401）');
+    } else if (getRes.status === 403) {
+      throw new Error('Token 缺少 public_repo 权限（403）');
+    } else if (getRes.status !== 404) {
+      throw new Error(`获取文件失败（${getRes.status}）`);
     }
-    if (!raw) throw new Error('云端数据为空');
-    db = JSON.parse(raw);
-    dbSave(); render();
+
+    const body = JSON.stringify({
+      message: '更新菜品数据',
+      content: b64enc(JSON.stringify(db)),
+      ...(sha ? { sha } : {}),
+    });
+    const putRes = await ghFetch(API_URL, { method: 'PUT', body });
+    if (putRes.status === 409) {
+      // SHA 冲突（两端同时写），重试一次
+      await writeToRepo(); return;
+    }
+    if (!putRes.ok) throw new Error(`保存失败（${putRes.status}）`);
     setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
   } catch(e) {
     setSyncState('err', e.message || '同步失败');
   }
 }
 
-function copyGistId() {
-  const id = getGistId();
-  if (!id) { alert('尚未生成 Gist ID，请先保存并连接。'); return; }
-  navigator.clipboard.writeText(id).then(
-    () => alert('Gist ID 已复制，粘贴到其他设备的同步设置中即可。'),
-    () => {
-      // 降级：选中文本手动复制
-      const el = document.getElementById('s-gist-id');
-      el.select(); el.setSelectionRange(0, 99);
+/* 从仓库拉取并合并到本地 */
+async function syncOnLoad() {
+  setSyncState('ing', '同步中…');
+  try {
+    const remote = await readFromRepo();
+    if (remote) { db = mergeDb(db, remote); dbSave(); render(); }
+    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
+    updateSettingsStatus('ok');
+  } catch(e) {
+    setSyncState('err', e.message || '读取失败');
+    updateSettingsStatus('err', e.message);
+  }
+}
+
+/* 强制用仓库数据覆盖本地 */
+async function forceFromRepo() {
+  if (!confirm('确定用云端数据完全覆盖本地？本地独有的菜将会丢失。')) return;
+  closeModal('settings-overlay');
+  setSyncState('ing', '同步中…');
+  try {
+    const remote = await readFromRepo();
+    if (!remote) throw new Error('云端暂无数据');
+    db = remote; dbSave(); render();
+    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
+  } catch(e) {
+    setSyncState('err', e.message || '获取失败');
+  }
+}
+
+async function saveToken() {
+  const val = document.getElementById('s-token').value.trim();
+  if (!val) return;
+  localStorage.setItem(TOKEN_KEY, val);
+  setSyncState('ing', '连接中…');
+  await syncOnLoad();   // 先拉云端数据合并
+  await writeToRepo();  // 再把合并结果推上去
+  closeModal('settings-overlay');
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = 'patmina-kitchen-backup.json';
+  a.click();
+}
+
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!imported.dishes) throw new Error('格式不正确');
+      db = mergeDb(db, imported);
+      dbSave(); render();
+      writeToRepo();
+      alert(`导入成功，当前共 ${db.dishes.length} 道菜。`);
+    } catch(err) {
+      alert('导入失败：' + err.message);
     }
-  );
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function clearSync() {
   if (!confirm('清除同步配置？本地数据不会删除。')) return;
   localStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(GIST_KEY);
   setSyncState('off', '同步设置');
   updateSettingsStatus('off');
   document.getElementById('s-token').value = '';
@@ -980,7 +954,7 @@ function saveDish() {
   dbSave();
   closeModal('form-overlay');
   render();
-  pushToGist();
+  writeToRepo();
 }
 
 function delDish(id) {
@@ -989,7 +963,7 @@ function delDish(id) {
   dbSave();
   closeModal('detail-overlay');
   render();
-  pushToGist();
+  writeToRepo();
 }
 
 /* ═══════════════════════════════════════
@@ -1023,15 +997,18 @@ function overlayClick(e, id) { if (e.target.id === id) closeModal(id); }
    Init
 ═══════════════════════════════════════ */
 async function init() {
-  const token = getToken();
-  if (token) {
-    setSyncState('ing', '同步中…');
-    updateSettingsStatus('ok');
-    document.getElementById('s-token').value = token;
-    const storedGistId = getGistId();
-    if (storedGistId) document.getElementById('s-gist-id').value = storedGistId;
-    await pullFromGist(true);
-  } else {
+  // 读取不需要 Token，手机电脑都能直接拿到最新数据
+  setSyncState('ing', '同步中…');
+  try {
+    const remote = await readFromRepo();
+    if (remote) { db = mergeDb(db, remote); dbSave(); }
+    const token = getToken();
+    if (token) {
+      document.getElementById('s-token').value = token;
+      updateSettingsStatus('ok');
+    }
+    setSyncState('ok', `已同步 · ${db.dishes.length} 道菜`);
+  } catch(e) {
     setSyncState('off', '同步设置');
   }
   document.getElementById('loading').classList.add('hidden');
